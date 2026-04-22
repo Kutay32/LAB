@@ -1,4 +1,4 @@
-const data = [
+const defaultData = [
   { category: "Temel kavramlar", term: "Token", definition: "Büyük dil modellerinde metnin işlenen en küçük birimi (kelime, hece veya harf olabilir)." },
   { category: "Temel kavramlar", term: "Context Window", definition: "Bağlam Penceresi: Modelin tek seferde işleyebildiği maksimum token (metin) miktarı." },
   { category: "Temel kavramlar", term: "Temperature", definition: "Sıcaklık: Modelin ürettiği metnin yaratıcılığını/rastgeleliğini kontrol eden parametre. Düşük değerler daha tutarlı, yüksek değerler daha yaratıcı sonuçlar verir." },
@@ -25,6 +25,16 @@ const data = [
   { category: "Sektör jargonu", term: "Tool Use / Function Calling", definition: "Araç Kullanımı / Fonksiyon Çağırma: Modelin internet araması yapmak, kod çalıştırmak veya bir API'ye bağlanmak gibi harici araçları kullanabilme yeteneği." }
 ];
 
+let data = [...defaultData];
+const savedData = localStorage.getItem('aiTermsData');
+if (savedData) {
+    try {
+        data = JSON.parse(savedData);
+    } catch (e) {
+        console.error("Error parsing saved data", e);
+    }
+}
+
 // --- Tab Management ---
 const tabs = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -49,26 +59,45 @@ const cardTerm = document.getElementById('card-term');
 const cardTermBack = document.getElementById('card-term-back');
 const cardDefinition = document.getElementById('card-definition');
 const cardProgress = document.getElementById('card-progress');
+const cardInstruction = document.getElementById('card-instruction');
 const filterSelect = document.getElementById('category-filter');
+const termSearch = document.getElementById('term-search');
 const practiceBanner = document.getElementById('practice-banner');
 const exitPracticeBtn = document.getElementById('exit-practice-btn');
 
 function renderCard(direction = 'none') {
-    if (currentCards.length === 0) return;
-    
     flashcardContainer.classList.remove('flipped');
     
     const updateContent = () => {
+        if (currentCards.length === 0) {
+            cardCategory.textContent = 'Sonuç Yok';
+            cardTerm.textContent = 'Bulunamadı';
+            cardTermBack.textContent = 'Bulunamadı';
+            cardDefinition.textContent = 'Arama kriterlerinize uygun terim bulunamadı.';
+            cardInstruction.textContent = 'Lütfen veri tabanında olan bir kelime aratın.';
+            cardProgress.textContent = '0 / 0';
+            return;
+        }
+        
         const card = currentCards[currentCardIndex];
         cardCategory.textContent = card.category;
         cardTerm.textContent = card.term;
         cardTermBack.textContent = card.term;
         cardDefinition.textContent = card.definition;
+        cardInstruction.textContent = 'Çeviriyi ve açıklamayı görmek için karta tıklayın';
         cardProgress.textContent = `${currentCardIndex + 1} / ${currentCards.length}`;
     };
 
     if (direction === 'none') {
         setTimeout(updateContent, 150);
+        return;
+    }
+    
+    if (direction === 'fade') {
+        flashcardContainer.style.animation = 'none';
+        void flashcardContainer.offsetWidth; // trigger reflow
+        flashcardContainer.style.animation = 'fadeIn 0.3s ease-out';
+        setTimeout(updateContent, 50);
         return;
     }
 
@@ -108,18 +137,93 @@ document.getElementById('next-btn').addEventListener('click', () => {
     }
 });
 
-filterSelect.addEventListener('change', (e) => {
-    const category = e.target.value;
-    if (category === 'all') {
-        currentCards = [...data];
-    } else {
-        currentCards = data.filter(item => item.category === category);
-    }
+function applyFilters() {
+    const category = filterSelect.value;
+    const query = termSearch.value.toLowerCase().trim();
+    
+    currentCards = data.filter(item => {
+        const matchesCategory = category === 'all' || item.category === category;
+        const matchesSearch = item.term.toLowerCase().includes(query) || item.definition.toLowerCase().includes(query);
+        return matchesCategory && matchesSearch;
+    });
+    
     currentCardIndex = 0;
-    renderCard();
-});
+    renderCard('fade');
+}
+
+filterSelect.addEventListener('change', applyFilters);
+termSearch.addEventListener('input', applyFilters);
+
+// --- Modal Logic ---
+const addTermBtn = document.getElementById('add-term-btn');
+const addTermModal = document.getElementById('add-term-modal');
+const closeModalBtn = document.getElementById('close-modal-btn');
+const cancelTermBtn = document.getElementById('cancel-term-btn');
+const saveTermBtn = document.getElementById('save-term-btn');
+
+const newTermInput = document.getElementById('new-term');
+const newCategoryInput = document.getElementById('new-category');
+const newDefinitionInput = document.getElementById('new-definition');
+
+function openModal() {
+    addTermModal.classList.remove('hidden');
+    newTermInput.focus();
+}
+
+function closeModal() {
+    addTermModal.classList.add('hidden');
+    newTermInput.value = '';
+    newDefinitionInput.value = '';
+    newCategoryInput.value = 'Temel kavramlar';
+}
+
+function saveNewTerm() {
+    const term = newTermInput.value.trim();
+    const category = newCategoryInput.value;
+    const definition = newDefinitionInput.value.trim();
+    
+    if (!term || !definition) {
+        alert("Lütfen kavram adını ve açıklamasını doldurun.");
+        return;
+    }
+    
+    const newCard = { category, term, definition };
+    data.push(newCard);
+    
+    // Check if category exists in select, if not add it
+    const existingOptions = Array.from(filterSelect.options).map(opt => opt.value);
+    if (!existingOptions.includes(category)) {
+        const newOption = document.createElement('option');
+        newOption.value = category;
+        newOption.textContent = category;
+        filterSelect.appendChild(newOption);
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('aiTermsData', JSON.stringify(data));
+    
+    closeModal();
+    applyFilters(); // refresh UI
+}
+
+addTermBtn.addEventListener('click', openModal);
+closeModalBtn.addEventListener('click', closeModal);
+cancelTermBtn.addEventListener('click', closeModal);
+saveTermBtn.addEventListener('click', saveNewTerm);
 
 // Init flashcards
+// Ensure custom categories from localStorage are in select
+const uniqueCategories = [...new Set(data.map(item => item.category))];
+uniqueCategories.forEach(cat => {
+    const existingOptions = Array.from(filterSelect.options).map(opt => opt.value);
+    if (!existingOptions.includes(cat)) {
+        const newOption = document.createElement('option');
+        newOption.value = cat;
+        newOption.textContent = cat;
+        filterSelect.appendChild(newOption);
+    }
+});
+
 renderCard();
 
 // --- Quiz Logic ---
@@ -331,6 +435,8 @@ function switchToFlashcards(wrongTerms = null) {
         currentCards = data.filter(d => wrongTerms.includes(d.term));
         filterSelect.value = 'all';
         filterSelect.disabled = true;
+        termSearch.value = '';
+        termSearch.disabled = true;
         practiceBanner.classList.remove('hidden');
         currentCardIndex = 0;
         renderCard();
@@ -342,9 +448,9 @@ if (exitPracticeBtn) {
         practiceBanner.classList.add('hidden');
         filterSelect.disabled = false;
         filterSelect.value = 'all';
-        currentCards = [...data];
-        currentCardIndex = 0;
-        renderCard();
+        termSearch.disabled = false;
+        termSearch.value = '';
+        applyFilters();
     });
 }
 

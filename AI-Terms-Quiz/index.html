@@ -10,7 +10,13 @@
 <body>
     <div class="app-container">
         <header>
-            <h1>Yapay Zeka Terimleri</h1>
+            <div class="header-top" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <h1>Yapay Zeka Terimleri</h1>
+                <button id="add-term-btn" class="btn secondary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Kavram Ekle
+                </button>
+            </div>
             <div class="tabs">
                 <button class="tab-btn active" data-tab="flashcards">Çalışma Kartları</button>
                 <button class="tab-btn" data-tab="quiz">Test (Quiz)</button>
@@ -25,12 +31,18 @@
                     <button id="exit-practice-btn" class="btn secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: #FCA5A5;">Normale Dön</button>
                 </div>
                 <div class="controls">
-                    <select id="category-filter">
-                        <option value="all">Tüm Kategoriler</option>
-                        <option value="Temel kavramlar">Temel kavramlar</option>
-                        <option value="Mimari">Mimari</option>
-                        <option value="Sektör jargonu">Sektör jargonu</option>
-                    </select>
+                    <div class="filters-group">
+                        <div class="search-container">
+                            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="term-search" class="search-input" placeholder="Terim ara..." autocomplete="off">
+                        </div>
+                        <select id="category-filter">
+                            <option value="all">Tüm Kategoriler</option>
+                            <option value="Temel kavramlar">Temel kavramlar</option>
+                            <option value="Mimari">Mimari</option>
+                            <option value="Sektör jargonu">Sektör jargonu</option>
+                        </select>
+                    </div>
                     <span class="progress-text" id="card-progress">1 / 10</span>
                 </div>
                 
@@ -39,7 +51,7 @@
                         <div class="flashcard-front">
                             <span class="category-badge" id="card-category">Kategori</span>
                             <h2 class="term" id="card-term">Term</h2>
-                            <p class="instruction">Çeviriyi ve açıklamayı görmek için karta tıklayın</p>
+                            <p class="instruction" id="card-instruction">Çeviriyi ve açıklamayı görmek için karta tıklayın</p>
                         </div>
                         <div class="flashcard-back">
                             <h3 class="term-back" id="card-term-back">Term</h3>
@@ -114,6 +126,39 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Add Term Modal -->
+    <div id="add-term-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Yeni Kavram Ekle</h2>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-term">Kavram Adı</label>
+                    <input type="text" id="new-term" placeholder="Örn: Gradient Descent" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="new-category">Kategori</label>
+                    <select id="new-category">
+                        <option value="Temel kavramlar">Temel kavramlar</option>
+                        <option value="Mimari">Mimari</option>
+                        <option value="Sektör jargonu">Sektör jargonu</option>
+                        <option value="Kullanıcı Eklenen">Kullanıcı Eklenen (Özel)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-definition">Açıklama</label>
+                    <textarea id="new-definition" rows="3" placeholder="Kavramın açıklamasını girin..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-term-btn" class="btn secondary">İptal</button>
+                <button id="save-term-btn" class="btn primary">Kaydet ve Ekle</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
