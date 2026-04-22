@@ -50,6 +50,8 @@ const cardTermBack = document.getElementById('card-term-back');
 const cardDefinition = document.getElementById('card-definition');
 const cardProgress = document.getElementById('card-progress');
 const filterSelect = document.getElementById('category-filter');
+const practiceBanner = document.getElementById('practice-banner');
+const exitPracticeBtn = document.getElementById('exit-practice-btn');
 
 function renderCard(direction = 'none') {
     if (currentCards.length === 0) return;
@@ -328,9 +330,22 @@ function switchToFlashcards(wrongTerms = null) {
     if (wrongTerms && wrongTerms.length > 0) {
         currentCards = data.filter(d => wrongTerms.includes(d.term));
         filterSelect.value = 'all';
+        filterSelect.disabled = true;
+        practiceBanner.classList.remove('hidden');
         currentCardIndex = 0;
         renderCard();
     }
+}
+
+if (exitPracticeBtn) {
+    exitPracticeBtn.addEventListener('click', () => {
+        practiceBanner.classList.add('hidden');
+        filterSelect.disabled = false;
+        filterSelect.value = 'all';
+        currentCards = [...data];
+        currentCardIndex = 0;
+        renderCard();
+    });
 }
 
 function renderQuestion() {
