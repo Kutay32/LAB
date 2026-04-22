@@ -61,11 +61,19 @@
                 <div class="quiz-active hidden" id="quiz-active">
                     <div class="quiz-header">
                         <span class="quiz-progress" id="quiz-progress">Soru: 1/10</span>
+                        <div class="timer-container">
+                            <div class="timer-bar-bg">
+                                <div class="timer-bar-fill" id="timer-bar"></div>
+                                <span class="timer-text-overlay" id="quiz-timer">10.0s</span>
+                            </div>
+                            <span class="combo-text hidden" id="quiz-combo">🔥 +5 Bonus</span>
+                        </div>
                         <span class="quiz-score" id="quiz-score">Puan: 0</span>
                     </div>
                     
                     <div class="question-container">
                         <p class="question-text" id="question-text">Question goes here?</p>
+                        <p class="answer-feedback hidden" id="answer-feedback"></p>
                     </div>
 
                     <div class="options-container" id="options-container">

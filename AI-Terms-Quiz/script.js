@@ -51,20 +51,41 @@ const cardDefinition = document.getElementById('card-definition');
 const cardProgress = document.getElementById('card-progress');
 const filterSelect = document.getElementById('category-filter');
 
-function renderCard() {
+function renderCard(direction = 'none') {
     if (currentCards.length === 0) return;
     
-    // Reset flip state before changing content
     flashcardContainer.classList.remove('flipped');
     
-    setTimeout(() => {
+    const updateContent = () => {
         const card = currentCards[currentCardIndex];
         cardCategory.textContent = card.category;
         cardTerm.textContent = card.term;
         cardTermBack.textContent = card.term;
         cardDefinition.textContent = card.definition;
         cardProgress.textContent = `${currentCardIndex + 1} / ${currentCards.length}`;
-    }, 150); // slight delay to allow flip animation to reset
+    };
+
+    if (direction === 'none') {
+        setTimeout(updateContent, 150);
+        return;
+    }
+
+    const outClass = direction === 'next' ? 'animating-next-out' : 'animating-prev-out';
+    const inClass = direction === 'next' ? 'animating-next-in' : 'animating-prev-in';
+
+    flashcardContainer.classList.remove('animating-next-out', 'animating-next-in', 'animating-prev-out', 'animating-prev-in');
+    
+    flashcardContainer.classList.add(outClass);
+    
+    setTimeout(() => {
+        updateContent();
+        flashcardContainer.classList.remove(outClass);
+        flashcardContainer.classList.add(inClass);
+        
+        setTimeout(() => {
+            flashcardContainer.classList.remove(inClass);
+        }, 200);
+    }, 200);
 }
 
 flashcardContainer.addEventListener('click', () => {
@@ -74,14 +95,14 @@ flashcardContainer.addEventListener('click', () => {
 document.getElementById('prev-btn').addEventListener('click', () => {
     if (currentCardIndex > 0) {
         currentCardIndex--;
-        renderCard();
+        renderCard('prev');
     }
 });
 
 document.getElementById('next-btn').addEventListener('click', () => {
     if (currentCardIndex < currentCards.length - 1) {
         currentCardIndex++;
-        renderCard();
+        renderCard('next');
     }
 });
 
@@ -103,6 +124,9 @@ renderCard();
 let quizQuestions = [];
 let currentQuestionIndex = 0;
 let score = 0;
+let streakBonus = 0;
+let timerInterval = null;
+let questionStartTime = 0;
 
 const quizSetup = document.getElementById('quiz-setup');
 const quizActive = document.getElementById('quiz-active');
@@ -112,6 +136,10 @@ const optionsContainer = document.getElementById('options-container');
 const quizProgress = document.getElementById('quiz-progress');
 const quizScore = document.getElementById('quiz-score');
 const nextQuestionBtn = document.getElementById('next-question-btn');
+const quizTimer = document.getElementById('quiz-timer');
+const timerBar = document.getElementById('timer-bar');
+const quizCombo = document.getElementById('quiz-combo');
+const answerFeedback = document.getElementById('answer-feedback');
 
 function shuffleArray(array) {
     const arr = [...array];
@@ -131,14 +159,23 @@ function generateQuestions() {
         // Randomly choose between "Ask definition given term" or "Ask term given definition"
         const askDefinition = Math.random() > 0.5;
         
+        const getCleanDef = (def) => {
+            const idx = def.indexOf(': ');
+            if (idx !== -1) {
+                let clean = def.substring(idx + 2).trim();
+                return clean.charAt(0).toUpperCase() + clean.slice(1);
+            }
+            return def;
+        };
+        
         let question, correctAnswer, wrongAnswers;
         
         if (askDefinition) {
             question = `Aşağıdakilerden hangisi "${item.term}" kavramının açıklamasıdır?`;
-            correctAnswer = item.definition;
-            wrongAnswers = shuffleArray(data.filter(d => d.term !== item.term)).slice(0, 3).map(d => d.definition);
+            correctAnswer = getCleanDef(item.definition);
+            wrongAnswers = shuffleArray(data.filter(d => d.term !== item.term)).slice(0, 3).map(d => getCleanDef(d.definition));
         } else {
-            question = `"${item.definition}"\n\nYukarıdaki açıklama hangi kavrama aittir?`;
+            question = `"${getCleanDef(item.definition)}"\n\nYukarıdaki açıklama hangi kavrama aittir?`;
             correctAnswer = item.term;
             wrongAnswers = shuffleArray(data.filter(d => d.term !== item.term)).slice(0, 3).map(d => d.term);
         }
@@ -155,6 +192,7 @@ function generateQuestions() {
 
 function startQuiz() {
     score = 0;
+    streakBonus = 0;
     currentQuestionIndex = 0;
     generateQuestions();
     
@@ -165,12 +203,56 @@ function startQuiz() {
     renderQuestion();
 }
 
+function startTimer() {
+    clearInterval(timerInterval);
+    questionStartTime = Date.now();
+    
+    const updateTimer = () => {
+        const elapsed = (Date.now() - questionStartTime) / 1000;
+        const timeLeft = Math.max(10 - elapsed, 0);
+        quizTimer.textContent = `${timeLeft.toFixed(1)}s`;
+        
+        const widthPercentage = (timeLeft / 10) * 100;
+        timerBar.style.width = `${widthPercentage}%`;
+        
+        if (timeLeft <= 3 && timeLeft > 0) {
+            timerBar.classList.add('warning');
+        } else {
+            timerBar.classList.remove('warning');
+        }
+        
+        if (timeLeft <= 0) {
+            quizTimer.textContent = `0.0s`;
+            timerBar.style.width = `0%`;
+            timerBar.classList.remove('warning');
+            clearInterval(timerInterval);
+        }
+    };
+    
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 100);
+}
+
 function renderQuestion() {
     const q = quizQuestions[currentQuestionIndex];
     
     quizProgress.textContent = `Soru: ${currentQuestionIndex + 1}/${quizQuestions.length}`;
     quizScore.textContent = `Puan: ${score}`;
     questionText.textContent = q.question;
+    
+    // Reset feedback
+    answerFeedback.classList.add('hidden');
+    answerFeedback.className = 'answer-feedback hidden';
+    
+    // Update combo UI
+    if (streakBonus > 0) {
+        quizCombo.textContent = `🔥 +${streakBonus} Bonus Aktif!`;
+        quizCombo.classList.remove('hidden');
+    } else {
+        quizCombo.classList.add('hidden');
+    }
+    
+    startTimer();
     
     optionsContainer.innerHTML = '';
     nextQuestionBtn.classList.add('hidden');
@@ -184,8 +266,42 @@ function renderQuestion() {
     });
 }
 
+function showFeedback(text, type) {
+    answerFeedback.textContent = text;
+    answerFeedback.className = `answer-feedback ${type}`;
+    answerFeedback.classList.remove('hidden');
+}
+
 function selectOption(selectedBtn, selectedAnswer, correctAnswer) {
+    clearInterval(timerInterval);
     const allOptions = optionsContainer.querySelectorAll('.option-btn');
+    
+    // Calculate points
+    const timeTaken = (Date.now() - questionStartTime) / 1000;
+    let pointsEarned = 0;
+    
+    if (selectedAnswer === correctAnswer) {
+        if (timeTaken <= 10) {
+            streakBonus += 5;
+            pointsEarned = 10 + streakBonus;
+            showFeedback(`Harika! +${pointsEarned} Puan (${timeTaken.toFixed(1)}s)`, 'success');
+        } else {
+            streakBonus = 0;
+            quizCombo.classList.add('hidden');
+            pointsEarned = 5;
+            showFeedback(`Doğru! +5 Puan (Süre dolduğu için daha az puan)`, 'success');
+        }
+        score += pointsEarned;
+    } else {
+        streakBonus = 0;
+        quizCombo.classList.add('hidden');
+        pointsEarned = -5; // Penalty
+        score += pointsEarned;
+        selectedBtn.classList.add('wrong');
+        showFeedback(`Yanlış Cevap! ${pointsEarned} Puan (Seri bozuldu)`, 'error');
+    }
+    
+    quizScore.textContent = `Puan: ${score}`;
     
     // Disable all options and show correct/wrong
     allOptions.forEach(btn => {
@@ -195,13 +311,6 @@ function selectOption(selectedBtn, selectedAnswer, correctAnswer) {
         }
     });
     
-    if (selectedAnswer === correctAnswer) {
-        score++;
-        quizScore.textContent = `Puan: ${score}`;
-    } else {
-        selectedBtn.classList.add('wrong');
-    }
-    
     nextQuestionBtn.classList.remove('hidden');
 }
 
@@ -209,13 +318,13 @@ function finishQuiz() {
     quizActive.classList.add('hidden');
     quizResults.classList.remove('hidden');
     
-    document.getElementById('final-score').textContent = `${score}/${quizQuestions.length}`;
+    document.getElementById('final-score').textContent = `${score} Puan`;
     
     const feedback = document.getElementById('feedback-text');
-    if (score === 10) feedback.textContent = "Mükemmel! Yapay zeka terimlerine tamamen hakimsiniz.";
-    else if (score >= 7) feedback.textContent = "Harika! Kavramların çoğunu öğrenmişsiniz.";
-    else if (score >= 4) feedback.textContent = "İyi deneme, ancak biraz daha çalışma kartlarına göz atabilirsiniz.";
-    else feedback.textContent = "Daha fazla pratik yapmanız gerekiyor, çalışma kartlarını tekrar edin.";
+    if (score >= 150) feedback.textContent = "Mükemmel! Süper hızlı ve hatasızsınız!";
+    else if (score >= 100) feedback.textContent = "Harika! Çoğu soruyu hızlıca bildiniz.";
+    else if (score >= 50) feedback.textContent = "İyi deneme, ancak seri bonuslarını yakalamak için biraz daha hızlanabilirsiniz.";
+    else feedback.textContent = "Daha fazla pratik yapmanız gerekiyor.";
 }
 
 document.getElementById('start-quiz-btn').addEventListener('click', startQuiz);
