@@ -319,6 +319,10 @@ select:focus {
     font-size: 1rem;
 }
 
+.icon-btn {
+    padding: 0.75rem 2.5rem;
+}
+
 /* Quiz Section */
 .quiz-setup, .quiz-active, .quiz-results {
     background-color: var(--bg-card);

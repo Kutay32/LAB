@@ -35,6 +35,9 @@ if (savedData) {
     }
 }
 
+// Tüm verileri alfabetik olarak sırala
+data.sort((a, b) => a.term.localeCompare(b.term, 'tr'));
+
 // --- Tab Management ---
 const tabs = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -189,6 +192,9 @@ function saveNewTerm() {
     
     const newCard = { category, term, definition };
     data.push(newCard);
+    
+    // Yeni eklenen kavramı alfabetik sıraya koy
+    data.sort((a, b) => a.term.localeCompare(b.term, 'tr'));
     
     // Check if category exists in select, if not add it
     const existingOptions = Array.from(filterSelect.options).map(opt => opt.value);
