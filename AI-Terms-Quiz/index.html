@@ -66,6 +66,10 @@
                                 <div class="timer-bar-fill" id="timer-bar"></div>
                                 <span class="timer-text-overlay" id="quiz-timer">10.0s</span>
                             </div>
+                            <div class="penalty-bar-bg hidden" id="penalty-bar-bg">
+                                <div class="penalty-bar-fill" id="penalty-bar"></div>
+                                <span class="penalty-text-overlay" id="penalty-text">-0</span>
+                            </div>
                             <span class="combo-text hidden" id="quiz-combo">🔥 +5 Bonus</span>
                         </div>
                         <span class="quiz-score" id="quiz-score">Puan: 0</span>
@@ -81,17 +85,28 @@
                     </div>
 
                     <div class="quiz-footer">
-                        <button id="next-question-btn" class="btn primary hidden">Sıradaki Soru</button>
                     </div>
                 </div>
 
                 <div class="quiz-results hidden" id="quiz-results">
-                    <h2>Test Tamamlandı!</h2>
+                    <h2 id="results-title">Test Tamamlandı!</h2>
                     <div class="score-circle">
-                        <span id="final-score">8/10</span>
+                        <span id="final-score">0</span>
                     </div>
-                    <p id="feedback-text">Tebrikler, harika bir iş çıkardınız!</p>
-                    <button id="restart-quiz-btn" class="btn primary">Yeniden Çöz</button>
+                    <p id="feedback-text"></p>
+                    
+                    <div class="results-details" id="results-details">
+                        <h3 class="results-section-title correct-title">✅ Doğru Cevaplar</h3>
+                        <div id="correct-list" class="results-list"></div>
+                        
+                        <h3 class="results-section-title wrong-title">❌ Yanlış Cevaplar</h3>
+                        <div id="wrong-list" class="results-list"></div>
+                    </div>
+                    
+                    <div class="results-actions">
+                        <button id="practice-wrong-btn" class="btn secondary hidden">Yanlışları Çalış</button>
+                        <button id="restart-quiz-btn" class="btn primary">Yeniden Çöz</button>
+                    </div>
                 </div>
             </section>
         </main>

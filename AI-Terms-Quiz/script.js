@@ -126,7 +126,10 @@ let currentQuestionIndex = 0;
 let score = 0;
 let streakBonus = 0;
 let timerInterval = null;
+let penaltyInterval = null;
+let penaltyPoints = 0;
 let questionStartTime = 0;
+let answerHistory = []; // track each answer
 
 const quizSetup = document.getElementById('quiz-setup');
 const quizActive = document.getElementById('quiz-active');
@@ -135,11 +138,13 @@ const questionText = document.getElementById('question-text');
 const optionsContainer = document.getElementById('options-container');
 const quizProgress = document.getElementById('quiz-progress');
 const quizScore = document.getElementById('quiz-score');
-const nextQuestionBtn = document.getElementById('next-question-btn');
 const quizTimer = document.getElementById('quiz-timer');
 const timerBar = document.getElementById('timer-bar');
 const quizCombo = document.getElementById('quiz-combo');
 const answerFeedback = document.getElementById('answer-feedback');
+const penaltyBarBg = document.getElementById('penalty-bar-bg');
+const penaltyBar = document.getElementById('penalty-bar');
+const penaltyText = document.getElementById('penalty-text');
 
 function shuffleArray(array) {
     const arr = [...array];
@@ -150,23 +155,21 @@ function shuffleArray(array) {
     return arr;
 }
 
+function getCleanDef(def) {
+    const idx = def.indexOf(': ');
+    if (idx !== -1) {
+        let clean = def.substring(idx + 2).trim();
+        return clean.charAt(0).toUpperCase() + clean.slice(1);
+    }
+    return def;
+}
+
 function generateQuestions() {
-    // 10 random questions
     const shuffledData = shuffleArray(data);
     const selectedData = shuffledData.slice(0, 10);
     
     quizQuestions = selectedData.map(item => {
-        // Randomly choose between "Ask definition given term" or "Ask term given definition"
         const askDefinition = Math.random() > 0.5;
-        
-        const getCleanDef = (def) => {
-            const idx = def.indexOf(': ');
-            if (idx !== -1) {
-                let clean = def.substring(idx + 2).trim();
-                return clean.charAt(0).toUpperCase() + clean.slice(1);
-            }
-            return def;
-        };
         
         let question, correctAnswer, wrongAnswers;
         
@@ -183,6 +186,7 @@ function generateQuestions() {
         const options = shuffleArray([correctAnswer, ...wrongAnswers]);
         
         return {
+            term: item.term,
             question,
             options,
             correctAnswer
@@ -194,6 +198,7 @@ function startQuiz() {
     score = 0;
     streakBonus = 0;
     currentQuestionIndex = 0;
+    answerHistory = [];
     generateQuestions();
     
     quizSetup.classList.add('hidden');
@@ -205,6 +210,8 @@ function startQuiz() {
 
 function startTimer() {
     clearInterval(timerInterval);
+    clearInterval(penaltyInterval);
+    penaltyPoints = 0;
     questionStartTime = Date.now();
     
     const updateTimer = () => {
@@ -226,11 +233,104 @@ function startTimer() {
             timerBar.style.width = `0%`;
             timerBar.classList.remove('warning');
             clearInterval(timerInterval);
+            startPenaltyTimer();
         }
     };
     
     updateTimer();
     timerInterval = setInterval(updateTimer, 100);
+}
+
+function startPenaltyTimer() {
+    streakBonus = 0;
+    quizCombo.classList.add('hidden');
+    penaltyBarBg.classList.remove('hidden');
+    penaltyBar.style.width = '0%';
+    penaltyPoints = 0;
+    penaltyText.textContent = '-0';
+    
+    const penaltyStartTime = Date.now();
+    const maxPenaltySeconds = 10;
+    
+    penaltyInterval = setInterval(() => {
+        const penaltyElapsed = (Date.now() - penaltyStartTime) / 1000;
+        penaltyPoints = Math.floor(penaltyElapsed);
+        
+        const penaltyWidth = Math.min((penaltyElapsed / maxPenaltySeconds) * 100, 100);
+        penaltyBar.style.width = `${penaltyWidth}%`;
+        penaltyText.textContent = `-${penaltyPoints}`;
+        
+        // Auto-fail at -10
+        if (penaltyPoints >= 10) {
+            clearInterval(penaltyInterval);
+            clearInterval(timerInterval);
+            penaltyText.textContent = `-10`;
+            penaltyBar.style.width = '100%';
+            
+            // Record this question as timeout
+            const q = quizQuestions[currentQuestionIndex];
+            answerHistory.push({
+                term: q.term,
+                correct: false,
+                timeTaken: 20,
+                points: -10,
+                bonus: 0,
+                reason: 'timeout'
+            });
+            score -= 10;
+            
+            autoFailQuiz();
+        }
+    }, 100);
+}
+
+function autoFailQuiz() {
+    clearInterval(timerInterval);
+    clearInterval(penaltyInterval);
+    
+    quizActive.classList.add('hidden');
+    quizResults.classList.remove('hidden');
+    
+    const resultsTitle = document.getElementById('results-title');
+    resultsTitle.textContent = 'Test Başarısız!';
+    
+    const scoreCircle = document.querySelector('.score-circle');
+    scoreCircle.classList.add('fail');
+    document.getElementById('final-score').textContent = `${score}`;
+    
+    document.getElementById('feedback-text').textContent = 'Ceza süresi -10\'a ulaştı. Daha fazla çalışmanız gerekiyor!';
+    
+    renderResultsDetails();
+    
+    // Auto-redirect to flashcards after showing results
+    const practiceBtn = document.getElementById('practice-wrong-btn');
+    practiceBtn.classList.remove('hidden');
+    practiceBtn.textContent = 'Çalışma Kartlarına Dön';
+    practiceBtn.onclick = () => {
+        switchToFlashcards();
+    };
+}
+
+function switchToFlashcards(wrongTerms = null) {
+    // Reset quiz UI
+    quizResults.classList.add('hidden');
+    quizSetup.classList.remove('hidden');
+    const scoreCircle = document.querySelector('.score-circle');
+    scoreCircle.classList.remove('fail');
+    
+    // Switch tabs
+    tabs.forEach(t => t.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="flashcards"]').classList.add('active');
+    document.getElementById('flashcards').classList.add('active');
+    
+    // If wrong terms provided, filter flashcards to those
+    if (wrongTerms && wrongTerms.length > 0) {
+        currentCards = data.filter(d => wrongTerms.includes(d.term));
+        filterSelect.value = 'all';
+        currentCardIndex = 0;
+        renderCard();
+    }
 }
 
 function renderQuestion() {
@@ -240,9 +340,11 @@ function renderQuestion() {
     quizScore.textContent = `Puan: ${score}`;
     questionText.textContent = q.question;
     
-    // Reset feedback
+    // Reset feedback & penalty bar
     answerFeedback.classList.add('hidden');
     answerFeedback.className = 'answer-feedback hidden';
+    penaltyBarBg.classList.add('hidden');
+    penaltyBar.style.width = '0%';
     
     // Update combo UI
     if (streakBonus > 0) {
@@ -255,7 +357,6 @@ function renderQuestion() {
     startTimer();
     
     optionsContainer.innerHTML = '';
-    nextQuestionBtn.classList.add('hidden');
     
     q.options.forEach(option => {
         const btn = document.createElement('button');
@@ -274,31 +375,60 @@ function showFeedback(text, type) {
 
 function selectOption(selectedBtn, selectedAnswer, correctAnswer) {
     clearInterval(timerInterval);
+    clearInterval(penaltyInterval);
     const allOptions = optionsContainer.querySelectorAll('.option-btn');
     
-    // Calculate points
     const timeTaken = (Date.now() - questionStartTime) / 1000;
     let pointsEarned = 0;
+    let bonusEarned = 0;
+    const q = quizQuestions[currentQuestionIndex];
     
     if (selectedAnswer === correctAnswer) {
         if (timeTaken <= 10) {
             streakBonus += 5;
+            bonusEarned = streakBonus;
             pointsEarned = 10 + streakBonus;
             showFeedback(`Harika! +${pointsEarned} Puan (${timeTaken.toFixed(1)}s)`, 'success');
+            
+            const appContainer = document.querySelector('.app-container');
+            appContainer.classList.add('shake-effect');
+            setTimeout(() => {
+                appContainer.classList.remove('shake-effect');
+            }, 400);
         } else {
             streakBonus = 0;
             quizCombo.classList.add('hidden');
-            pointsEarned = 5;
-            showFeedback(`Doğru! +5 Puan (Süre dolduğu için daha az puan)`, 'success');
+            pointsEarned = 5 - penaltyPoints;
+            if (pointsEarned > 0) {
+                showFeedback(`Doğru! +${pointsEarned} Puan (Süre doldu, -${penaltyPoints} ceza)`, 'success');
+            } else {
+                showFeedback(`Doğru ama çok geç! ${pointsEarned} Puan (-${penaltyPoints} ceza)`, 'error');
+            }
         }
         score += pointsEarned;
+        
+        answerHistory.push({
+            term: q.term,
+            correct: true,
+            timeTaken: timeTaken,
+            points: pointsEarned,
+            bonus: bonusEarned
+        });
     } else {
         streakBonus = 0;
         quizCombo.classList.add('hidden');
-        pointsEarned = -5; // Penalty
+        pointsEarned = -5;
         score += pointsEarned;
         selectedBtn.classList.add('wrong');
         showFeedback(`Yanlış Cevap! ${pointsEarned} Puan (Seri bozuldu)`, 'error');
+        
+        answerHistory.push({
+            term: q.term,
+            correct: false,
+            timeTaken: timeTaken,
+            points: pointsEarned,
+            bonus: 0
+        });
     }
     
     quizScore.textContent = `Puan: ${score}`;
@@ -311,29 +441,93 @@ function selectOption(selectedBtn, selectedAnswer, correctAnswer) {
         }
     });
     
-    nextQuestionBtn.classList.remove('hidden');
+    // Auto-advance after 1.2s
+    setTimeout(() => {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < quizQuestions.length) {
+            renderQuestion();
+        } else {
+            finishQuiz();
+        }
+    }, 1200);
+}
+
+function renderResultsDetails() {
+    const correctList = document.getElementById('correct-list');
+    const wrongList = document.getElementById('wrong-list');
+    correctList.innerHTML = '';
+    wrongList.innerHTML = '';
+    
+    const correctAnswers = answerHistory.filter(a => a.correct);
+    const wrongAnswers = answerHistory.filter(a => !a.correct);
+    
+    if (correctAnswers.length === 0) {
+        correctList.innerHTML = '<p style="font-size:0.85rem;color:#6B7280;padding:0.5rem 0;">Doğru cevap yok.</p>';
+    } else {
+        correctAnswers.forEach(a => {
+            const item = document.createElement('div');
+            item.className = 'result-item correct-item';
+            const bonusText = a.bonus > 0 ? ` (+${a.bonus} bonus)` : '';
+            item.innerHTML = `
+                <span class="term-name">${a.term}</span>
+                <span class="result-meta">${a.timeTaken.toFixed(1)}s · +${a.points} puan${bonusText}</span>
+            `;
+            correctList.appendChild(item);
+        });
+    }
+    
+    if (wrongAnswers.length === 0) {
+        wrongList.innerHTML = '<p style="font-size:0.85rem;color:#6B7280;padding:0.5rem 0;">Yanlış cevap yok. Tebrikler!</p>';
+    } else {
+        wrongAnswers.forEach(a => {
+            const item = document.createElement('div');
+            item.className = 'result-item wrong-item';
+            const reason = a.reason === 'timeout' ? 'Süre doldu' : `${a.timeTaken.toFixed(1)}s`;
+            item.innerHTML = `
+                <span class="term-name">${a.term}</span>
+                <span class="result-meta">${reason} · ${a.points} puan</span>
+            `;
+            wrongList.appendChild(item);
+        });
+    }
+    
+    // Practice wrong answers button
+    const practiceBtn = document.getElementById('practice-wrong-btn');
+    if (wrongAnswers.length > 0) {
+        practiceBtn.classList.remove('hidden');
+        practiceBtn.textContent = `Yanlışları Çalış (${wrongAnswers.length} kavram)`;
+        practiceBtn.onclick = () => {
+            const wrongTerms = wrongAnswers.map(a => a.term);
+            switchToFlashcards(wrongTerms);
+        };
+    } else {
+        practiceBtn.classList.add('hidden');
+    }
 }
 
 function finishQuiz() {
+    clearInterval(timerInterval);
+    clearInterval(penaltyInterval);
+    
     quizActive.classList.add('hidden');
     quizResults.classList.remove('hidden');
     
-    document.getElementById('final-score').textContent = `${score} Puan`;
+    const resultsTitle = document.getElementById('results-title');
+    resultsTitle.textContent = 'Test Tamamlandı!';
+    
+    const scoreCircle = document.querySelector('.score-circle');
+    scoreCircle.classList.remove('fail');
+    document.getElementById('final-score').textContent = `${score}`;
     
     const feedback = document.getElementById('feedback-text');
     if (score >= 150) feedback.textContent = "Mükemmel! Süper hızlı ve hatasızsınız!";
     else if (score >= 100) feedback.textContent = "Harika! Çoğu soruyu hızlıca bildiniz.";
-    else if (score >= 50) feedback.textContent = "İyi deneme, ancak seri bonuslarını yakalamak için biraz daha hızlanabilirsiniz.";
+    else if (score >= 50) feedback.textContent = "İyi deneme, seri bonuslarını yakalamak için biraz daha hızlanabilirsiniz.";
     else feedback.textContent = "Daha fazla pratik yapmanız gerekiyor.";
+    
+    renderResultsDetails();
 }
 
 document.getElementById('start-quiz-btn').addEventListener('click', startQuiz);
 document.getElementById('restart-quiz-btn').addEventListener('click', startQuiz);
-nextQuestionBtn.addEventListener('click', () => {
-    currentQuestionIndex++;
-    if (currentQuestionIndex < quizQuestions.length) {
-        renderQuestion();
-    } else {
-        finishQuiz();
-    }
-});
+
