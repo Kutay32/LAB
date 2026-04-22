@@ -348,7 +348,7 @@ function renderQuestion() {
     
     // Update combo UI
     if (streakBonus > 0) {
-        quizCombo.textContent = `🔥 +${streakBonus} Bonus Aktif!`;
+        quizCombo.textContent = `+${streakBonus} Bonus Aktif!`;
         quizCombo.classList.remove('hidden');
     } else {
         quizCombo.classList.add('hidden');
